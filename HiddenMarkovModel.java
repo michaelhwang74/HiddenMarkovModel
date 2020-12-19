@@ -1,7 +1,10 @@
 import java.io.File;
 import java.io.IOException;
 import java.io.FileWriter;
+import java.util.Scanner;
 import java.util.Random;
+import java.util.stream.*;
+import java.util.ArrayList;
 import java.text.DecimalFormat;
 
 
@@ -68,7 +71,29 @@ public class HiddenMarkovModel{
     }
 
     public void load(String loadFile){
+        try{
+            Scanner reader = new Scanner(new File(loadFile));
 
+            initial = loadString(reader.nextLine());
+            reader.nextLine();//skip blank line
+            
+            ArrayList<double[]> trans = new ArrayList<double[]>();
+            String line = "";
+            while(!(line = reader.nextLine()).equals("")){
+                trans.add(loadString(line));
+            }
+
+            ArrayList<double[]> emit = new ArrayList<double[]>();
+            while(reader.hasNext() && !(line = reader.nextLine()).equals("")){
+                emit.add(loadString(line));
+            }
+
+            transition = trans.stream().toArray(double[][]::new);
+            emission = emit.stream().toArray(double[][]::new);
+            numStates = transition.length;
+            numSymbols = emission[0].length;
+            reader.close();
+        } catch(IOException e) {e.printStackTrace();}
     }
     public void save(String saveFile){
         try{
@@ -85,7 +110,9 @@ public class HiddenMarkovModel{
             save.close();
         } catch(IOException e) {e.printStackTrace();}
     }
-
+    private double[] loadString(String string){
+        return Stream.of(string.split(",")).mapToDouble(Double::parseDouble).toArray();
+    }
     private String arrayToString(double[] array){
         StringBuilder string = new StringBuilder();
         for(int i = 0; i < array.length-1; i++){
@@ -267,7 +294,7 @@ public class HiddenMarkovModel{
         return clone;
     }    
 
-    private void initializeUniform(){
+    public void initializeUniform(){
         for(int state = 0; state < numStates; state++) {
             transition[state] = uniformDist(numStates); 
             emission[state] = uniformDist(numSymbols);

@@ -14,7 +14,6 @@ public class test{
         hmm.train(Integer.parseInt(args[1]), Integer.parseInt(args[2]), observations);
         hmm.printEmissionMatrixTransposed();
 
-
     }
 
     public static String readFile(String fileName){
