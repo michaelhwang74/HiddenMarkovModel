@@ -1,4 +1,6 @@
 import java.io.File;
+import java.io.IOException;
+import java.io.FileWriter;
 import java.util.Random;
 import java.text.DecimalFormat;
 
@@ -7,9 +9,6 @@ public class HiddenMarkovModel{
     private int numSymbols;
 
     private double[] initial;
-    private double[][] gamma;
-    private double[][][] digamma;
-
     private double[][] transition;
     private double[][] emission;
 
@@ -20,22 +19,45 @@ public class HiddenMarkovModel{
         emission = new double[numStates][numSymbols];
         initial = new double[numStates];
 
-        this.numStates = numStates; 
+        this.numStates = numStates;
         this.numSymbols = numSymbols;
 
         initializeUniform();
     }
 
-    public HiddenMarkovModel(File loadFile){
+    public HiddenMarkovModel(String loadFile){
         loadFile(loadFile);
     }
 
 
-    public void load(File loadFile){
+    public void load(String loadFile){
 
     }
-    public void save(File saveFile){
-        
+    public void save(String saveFile){
+        try{
+            FileWriter save = new FileWriter(saveFile);
+            save.write(arrayToString(initial));
+            save.write('\n');
+
+            for(double[] array:transition)
+                save.write(arrayToString(array));
+            save.write('\n');
+
+            for(double[] array:emission)
+                save.write(arrayToString(array))
+            save.close();
+        } catch(IOException e) {e.printStackTrace();}
+    }
+
+    private String arrayToString(double[] array){
+        StringBuilder string = new StringBuilder();
+        for(int i = 0; i < array.length-1; i++){
+            string.append(array[i]);
+            string.append(',');
+        }
+        string.append(array[array.length-1]);
+        string.append('\n');
+        return string.toString();
     }
 
     public double[] getInitial() {
