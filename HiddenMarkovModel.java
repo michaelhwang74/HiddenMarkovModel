@@ -4,6 +4,8 @@ import java.io.FileWriter;
 import java.util.Random;
 import java.text.DecimalFormat;
 
+import java.util.Arrays;
+
 public class HiddenMarkovModel{
     private int numStates;
     private int numSymbols;
@@ -26,9 +28,45 @@ public class HiddenMarkovModel{
     }
 
     public HiddenMarkovModel(String loadFile){
-        loadFile(loadFile);
+        load(loadFile);
     }
 
+    public double train(int maxIterations, int numResets, int[] observations){
+        double oldLogProb = trainHelper(maxIterations, observations);
+        double[][] transition = copyMatrix(this.transition);
+        double[][] emission = copyMatrix(this.emission);
+        
+        for(int i = 0; i < numResets; i++) {
+            initializeUniform();
+            double newLogProb = trainHelper(maxIterations, observations);
+            if(newLogProb > oldLogProb) {   //if probability increases
+                oldLogProb = newLogProb;
+                transition = copyMatrix(this.transition);
+                emission = copyMatrix(this.emission);
+            }
+        }
+        
+        this.transition = transition;
+        this.emission = emission;
+        return oldLogProb;
+
+    }
+
+    public void printEmissionMatrixTransposed() {
+        DecimalFormat df = new DecimalFormat("#.####");
+        int a = (int) 'a';
+        System.out.print("l\t");
+        for(int state = 0; state < numStates; state++)
+            System.out.printf("%d\t", state+1);
+        System.out.println("test string");
+        for(int symbol = 0; symbol < numSymbols; symbol++) {
+            //System.out.print((char)((int) 'a' + observ)+"\t");
+            System.out.print((char)(a + symbol) + "\t");
+            for(int state = 0; state < numStates; state++)
+                System.out.printf("%s\t", df.format(emission[state][symbol]));
+            System.out.println();
+        }
+    }
 
     public void load(String loadFile){
 
@@ -44,7 +82,7 @@ public class HiddenMarkovModel{
             save.write('\n');
 
             for(double[] array:emission)
-                save.write(arrayToString(array))
+                save.write(arrayToString(array));
             save.close();
         } catch(IOException e) {e.printStackTrace();}
     }
@@ -66,24 +104,8 @@ public class HiddenMarkovModel{
     public double[][] getTransition(){
         return transition;
     }
-    public double[][] getemission(){
+    public double[][] getEmission(){
         return emission;
-    }
-
-    public void printEmissionMatrixTransposed() {
-        DecimalFormat df = new DecimalFormat("#.####");
-        int a = (int) 'a';
-        System.out.print("l\t");
-        for(int state = 0; state < numStates; state++)
-            System.out.printf("%d\t", state+1);
-        System.out.println("test string");
-        for(int symbol = 0; symbol < numSymbols; symbol++) {
-            //System.out.print((char)((int) 'a' + observ)+"\t");
-            System.out.print((char)(a + symbol) + "\t");
-            for(int state = 0; state < numStates; state++)
-                System.out.printf("%s\t", df.format(emission[state][symbol]));
-            System.out.println();
-        }
     } 
 
     public double logProb(double[] scalars) {
@@ -112,9 +134,8 @@ public class HiddenMarkovModel{
         for(int time = 1; time < observations.length; time++) {
             scalars[time] = 0;
             for(int state = 0; state < numStates; state++) {
-                //System.out.println(observations[time]);
                 alpha[time][state] = forward_helper(state, time, alpha) * emission[state][observations[time]];
-                    scalars[time] += alpha[time][state];
+                scalars[time] += alpha[time][state];
             }
             // scale each alpha at time > 0 for each state
             scalars[time] = 1.0/scalars[time];
@@ -132,9 +153,8 @@ public class HiddenMarkovModel{
      */
     private double forward_helper(int state, int time, double[][] alpha) {
         double sum = 0;
-        alpha[time][state] = 0;
         for(int i = 0; i < numStates; i++)
-            sum += alpha[time-1][i] * emission[i][state];
+            sum += alpha[time-1][i] * transition[i][state];
         return sum;
     }
 
@@ -144,16 +164,17 @@ public class HiddenMarkovModel{
         for(int state = 0; state < numStates; state++)
             beta[observations.length-1][state] = scalars[observations.length-1];
         
-        for(int time  = observations.length - 2; time >= 0; time--) 
+        for(int time = observations.length - 2; time >= 0; time--){
             for(int state = 0; state < numStates; state++) {
                 beta[time][state] = backward_helper(state, time, observations, beta);
                 beta[time][state] *= scalars[time];
             }
+            //System.out.println(Arrays.toString(beta[time]));
+        }
     }
 
     private double backward_helper(int state, int time, int[] observations, double[][] beta){
         double sum = 0;
-        beta[time][state] = 0;
         for(int i = 0; i < numStates; i++)
             // start at $state then transition to i and observe at next time * previous beta term (beta iterates backwards)
             sum += transition[state][i] * emission[i][observations[time+1]] * beta[time+1][i];
@@ -161,40 +182,27 @@ public class HiddenMarkovModel{
     } 
 
     private void gammaDigamma(int[] observations, double[][] alpha, double[][] beta, double[][] gamma, double[][][] digamma) {
-        // alpha and beta already scaled so don't need to scale digamma now
-        for(int time = 0; time < observations.length-1; time++)
+        // alpha and beta already scaled so don't need to scale digamma
+        for(int time = 0; time < observations.length-1; time++){
+            double denom = 0;
+            for(int state_1 = 0; state_1 < numStates; state_1++)
+                for(int state_2 = 0; state_2 < numStates; state_2++)
+                    denom += alpha[time][state_1]*transition[state_1][state_2]*emission[state_2][observations[time+1]] * beta[time+1][state_2];
+
             for(int state_1 = 0; state_1 < numStates; state_1++) {
                 gamma[time][state_1] = 0;
                 for(int state_2 = 0; state_2 < numStates; state_2++) {
-                    digamma[time][state_1][state_2] = alpha[time][state_1] * transition[state_1][state_2] * emission[state_2][observations[time+1]] * beta[time+1][state_2];
+                    digamma[time][state_1][state_2] = alpha[time][state_1] * transition[state_1][state_2] * emission[state_2][observations[time+1]] * beta[time+1][state_2]/denom;
                     gamma[time][state_1] += digamma[time][state_1][state_2];
                 }
             }
-        //special case for gamma of each state at last time
-        for(int state = 0; state < numStates; state++)
-            gamma[observations.length-1][state] = alpha[observations.length-1][state];
-    }
-
-
-    public double train(int maxIterations, int numResets, int[] observations){
-        double oldLogProb = trainHelper(maxIterations, observations);
-        double[][] transition = copyMatrix(this.transition);
-        double[][] emission = copyMatrix(this.emission);
-        
-        for(int i = 0; i < numResets; i++) {
-            initializeUniform();
-            double newLogProb = trainHelper(maxIterations, observations);
-            if(newLogProb > oldLogProb) {   //if probability increases
-                oldLogProb = newLogProb;
-                transition = copyMatrix(this.transition);
-                emission = copyMatrix(this.emission);
-            }
         }
-        
-        this.transition = transition;
-        this.emission = emission;
-        return oldLogProb;
-
+        //special case for gamma of each state at last time
+        double denom = 0;
+        for(int state = 0; state < numStates; state++)
+            denom += alpha[observations.length-1][state];
+        for(int state = 0; state < numStates; state++)
+            gamma[observations.length-1][state] = alpha[observations.length-1][state]/denom;
     }
 
     private double trainHelper(int maxIterations, int[] observations) {
@@ -207,14 +215,13 @@ public class HiddenMarkovModel{
         double[][][] digamma = new double[observations.length][numStates][numStates];
         for(int i = 0; i < maxIterations; i++) {
             double[] scalars = forward(observations, alpha);
-            
             backward(observations, beta, scalars);
+
             gammaDigamma(observations, alpha, beta, gamma, digamma);
             reestimate(observations, gamma, digamma);
             
             double logProb = logProb(scalars);
             delta = logProb - oldLogProb;
-            //System.out.println(i + "\t"+ oldLogProb);
             if(delta < 0 || (i > 50 && Math.abs(delta) < 0.0001))  //logProb <= oldLogProb
                 break;
             oldLogProb = logProb;
@@ -279,7 +286,7 @@ public class HiddenMarkovModel{
         double[] randNums = new double[num];
         double total = 0;
         for(int i = 0; i < num; i++) {
-            randNums[i] = rng.nextInt(10000) + 100000;
+            randNums[i] = rng.nextInt(10000) + 10000;
             total += randNums[i];
         }
         for(int i = 0; i < num; i++) {
