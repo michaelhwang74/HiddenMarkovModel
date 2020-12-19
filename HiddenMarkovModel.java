@@ -183,15 +183,11 @@ public class HiddenMarkovModel{
     private void gammaDigamma(int[] observations, double[][] alpha, double[][] beta, double[][] gamma, double[][][] digamma) {
         // alpha and beta already scaled so don't need to scale digamma
         for(int time = 0; time < observations.length-1; time++){
-            double denom = 0;
-            for(int state_1 = 0; state_1 < numStates; state_1++)
-                for(int state_2 = 0; state_2 < numStates; state_2++)
-                    denom += alpha[time][state_1]*transition[state_1][state_2]*emission[state_2][observations[time+1]] * beta[time+1][state_2];
 
             for(int state_1 = 0; state_1 < numStates; state_1++) {
                 gamma[time][state_1] = 0;
                 for(int state_2 = 0; state_2 < numStates; state_2++) {
-                    digamma[time][state_1][state_2] = alpha[time][state_1] * transition[state_1][state_2] * emission[state_2][observations[time+1]] * beta[time+1][state_2]/denom;
+                    digamma[time][state_1][state_2] = alpha[time][state_1] * transition[state_1][state_2] * emission[state_2][observations[time+1]] * beta[time+1][state_2];
                     gamma[time][state_1] += digamma[time][state_1][state_2];
                 }
             }
