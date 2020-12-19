@@ -20,7 +20,7 @@ public class HiddenMarkovModel{
         emission = new double[numStates][numSymbols];
         initial = new double[numStates];
 
-        this.numStates = numStates;
+        this.numStates = numStates; 
         this.numSymbols = numSymbols;
 
         initializeUniform();
